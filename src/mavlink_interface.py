@@ -24,7 +24,41 @@ class mavlink_interface:
         self.connection.wait_heartbeat()
         print("Heartbeat from system (system %u component %u)" % (self.connection.target_system, self.connection.target_component))
 
+    ## Commands
+
+    def command_position(self, params):
+        #comands a position in local coordinates x, y, z
+
+        type_mask = (
+            mavutil.mavlink.POSITION_TARGET_TYPEMASK_X_IGNORE |
+            mavutil.mavlink.POSITION_TARGET_TYPEMASK_Y_IGNORE |
+            mavutil.mavlink.POSITION_TARGET_TYPEMASK_Z_IGNORE |
+            mavutil.mavlink.POSITION_TARGET_TYPEMASK_VX_IGNORE |
+            mavutil.mavlink.POSITION_TARGET_TYPEMASK_VY_IGNORE |
+            mavutil.mavlink.POSITION_TARGET_TYPEMASK_VZ_IGNORE |
+            mavutil.mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE |
+            mavutil.mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE |
+            mavutil.mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE |
+            mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_IGNORE |
+            mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE
+        )
+        
+        self.connection.mav.set_position_target_local_ned_send(
+            int(time.time() * 1000), # time_boot_ms
+            self.connection.target_system, # target_system
+            self.connection.target_component, # target_component
+            mavutil.mavlink.MAV_FRAME_LOCAL_NED, # coordinate frame
+            type_mask, # type_mask (only position)
+            params[0], params[1], params[2], # x, y, z positions (used)
+            0, 0, 0, # x, y, z velocity in m/s (not used)
+            0, 0, 0, # x, y, z acceleration (not used)
+            0, 0 #  Yaw in radians (not used), yaw rate in rad/s (not used)
+        )
+
     def command_velocity_yaw(self, params):
+        #comands a velocity vector in local coordinates in x, y, z direction. 
+        #commands a yaw.
+
         type_mask = (
             mavutil.mavlink.POSITION_TARGET_TYPEMASK_X_IGNORE |
             mavutil.mavlink.POSITION_TARGET_TYPEMASK_Y_IGNORE |
