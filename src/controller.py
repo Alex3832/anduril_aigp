@@ -82,7 +82,7 @@ VELOCITY_POSITION_MASK = (
         mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE
 )
 
-def update_position_flight_control(mavlink_conn, system_boot_ms):
+def update_position_flight_control_test(mavlink_conn, system_boot_ms):
     now_ms = int(time.time() * 1000)
 
     """
@@ -120,48 +120,48 @@ def update_position_flight_control(mavlink_conn, system_boot_ms):
         0.0             # ignored yaw rate
     )
 
-    def update_position_flight_control(mavlink_conn, system_boot_ms, vx, vy, vz):
-        now_ms = int(time.time() * 1000)
+def update_position_flight_control(mavlink_conn, system_boot_ms, vx, vy, vz):
+    now_ms = int(time.time() * 1000)
 
-        """
-        Sets a desired vehicle position in a local north-east-down coordinate
-        frame. Used by an external controller to command the vehicle
-        (manual controller or other system).
+    """
+    Sets a desired vehicle position in a local north-east-down coordinate
+    frame. Used by an external controller to command the vehicle
+    (manual controller or other system).
 
-        time_boot_ms              : Timestamp (time since system boot). [ms] (type:uint32_t)
-        target_system             : System ID (type:uint8_t)
-        target_component          : Component ID (type:uint8_t)
-        coordinate_frame          : Valid options are: MAV_FRAME_LOCAL_NED = 1, MAV_FRAME_LOCAL_OFFSET_NED = 7, MAV_FRAME_BODY_NED = 8, MAV_FRAME_BODY_OFFSET_NED = 9 (type:uint8_t, values:MAV_FRAME)
-        type_mask                 : Bitmap to indicate which dimensions should be ignored by the vehicle. (type:uint16_t, values:POSITION_TARGET_TYPEMASK)
-        x                         : X Position in NED frame [m] (type:float)
-        y                         : Y Position in NED frame [m] (type:float)
-        z                         : Z Position in NED frame (note, altitude is negative in NED) [m] (type:float)
-        vx                        : X velocity in NED frame [m/s] (type:float)
-        vy                        : Y velocity in NED frame [m/s] (type:float)
-        vz                        : Z velocity in NED frame [m/s] (type:float)
-        afx                       : X acceleration or force (if bit 10 of type_mask is set) in NED frame in meter / s^2 or N [m/s/s] (type:float)
-        afy                       : Y acceleration or force (if bit 10 of type_mask is set) in NED frame in meter / s^2 or N [m/s/s] (type:float)
-        afz                       : Z acceleration or force (if bit 10 of type_mask is set) in NED frame in meter / s^2 or N [m/s/s] (type:float)
-        yaw                       : yaw setpoint [rad] (type:float)
-        yaw_rate                  : yaw rate setpoint [rad/s] (type:float)
-        """
+    time_boot_ms              : Timestamp (time since system boot). [ms] (type:uint32_t)
+    target_system             : System ID (type:uint8_t)
+    target_component          : Component ID (type:uint8_t)
+    coordinate_frame          : Valid options are: MAV_FRAME_LOCAL_NED = 1, MAV_FRAME_LOCAL_OFFSET_NED = 7, MAV_FRAME_BODY_NED = 8, MAV_FRAME_BODY_OFFSET_NED = 9 (type:uint8_t, values:MAV_FRAME)
+    type_mask                 : Bitmap to indicate which dimensions should be ignored by the vehicle. (type:uint16_t, values:POSITION_TARGET_TYPEMASK)
+    x                         : X Position in NED frame [m] (type:float)
+    y                         : Y Position in NED frame [m] (type:float)
+    z                         : Z Position in NED frame (note, altitude is negative in NED) [m] (type:float)
+    vx                        : X velocity in NED frame [m/s] (type:float)
+    vy                        : Y velocity in NED frame [m/s] (type:float)
+    vz                        : Z velocity in NED frame [m/s] (type:float)
+    afx                       : X acceleration or force (if bit 10 of type_mask is set) in NED frame in meter / s^2 or N [m/s/s] (type:float)
+    afy                       : Y acceleration or force (if bit 10 of type_mask is set) in NED frame in meter / s^2 or N [m/s/s] (type:float)
+    afz                       : Z acceleration or force (if bit 10 of type_mask is set) in NED frame in meter / s^2 or N [m/s/s] (type:float)
+    yaw                       : yaw setpoint [rad] (type:float)
+    yaw_rate                  : yaw rate setpoint [rad/s] (type:float)
+    """
 
-       
+    
 
 
 
-        mavlink_conn.mav.set_position_target_local_ned_send(
-            now_ms - system_boot_ms,
-            mavlink_conn.target_system,
-            mavlink_conn.target_component,
-            mavutil.mavlink.MAV_FRAME_LOCAL_NED,
-            VELOCITY_POSITION_MASK,
-            0.0, 0, 0.0,    # ignored position NED
-            vx, vy, vz,  # Vel
-            0.0, 0, 0.0,    # ignored acceleration
-            0,              # ignored yaw
-            0.0             # ignored yaw rate
-        )
+    mavlink_conn.mav.set_position_target_local_ned_send(
+        now_ms - system_boot_ms,
+        mavlink_conn.target_system,
+        mavlink_conn.target_component,
+        mavutil.mavlink.MAV_FRAME_LOCAL_NED,
+        VELOCITY_POSITION_MASK,
+        0.0, 0, 0.0,    # ignored position NED
+        vx, vy, vz,  # Vel
+        0.0, 0, 0.0,    # ignored acceleration
+        0,              # ignored yaw
+        0.0             # ignored yaw rate
+    )
 
 # --------------------------------------------------------------------------------------
 # Control Loop
@@ -179,20 +179,31 @@ class Controller:
         # send automated targets to sim flight controller
         # update_attitude_flight_control(self.sim_conn, self.system_boot_ms)
         # alternatively one of
-        # update_position_flight_control(self.sim_conn, self.system_boot_ms)
+        update_position_flight_control(self.sim_conn, self.system_boot_ms, 0.0, 0.0, 0.0)  # test constant velocity command
         # update_motor_control(self.sim_conn, self.system_boot_ms)
 
+        # self.position_control_pid()
+
         time.sleep(1.0 / CONTROL_HZ)
+
+    def attitude_control_pid(self):
+        
 
     def position_control_pid(self):
         P_gain = 0.5
         I_gain = 0.0
         D_gain = 0.0
 
+        if 'pos_x' in self.data:
+            print(f"Current position: x={self.data['pos_x']:.2f}, y={self.data['pos_y']:.2f}, z={self.data['pos_z']:.2f}", flush=True)  
 
-        x_error = self.data['Gates'][self.data['active_gate_index']]['position_ned_x'] - self.data['pos_x']
-        y_error = self.data['Gates'][self.data['active_gate_index']]['position_ned_y'] - self.data['pos_y']
-        z_error = self.data['Gates'][self.data['active_gate_index']]['position_ned_z'] - self.data['pos_z']
+        if 'active_gate_index' not in self.data or 'gates' not in self.data:
+            print("No gate information received yet, skipping position control update...", flush=True)
+            return
+
+        x_error = self.data['gates'][self.data['active_gate_index']]['position_ned_x'] - self.data['pos_x']
+        y_error = self.data['gates'][self.data['active_gate_index']]['position_ned_y'] - self.data['pos_y']
+        z_error = self.data['gates'][self.data['active_gate_index']]['position_ned_z'] - self.data['pos_z']
 
         V_x = P_gain * x_error
         V_y = P_gain * y_error
@@ -221,3 +232,5 @@ class Controller:
             0,  # confirmation
             0, 0, 0, 0, 0, 0, 0
         )
+
+

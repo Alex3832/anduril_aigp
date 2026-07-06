@@ -11,10 +11,7 @@ Competition: Anduril AI Grand Prix
 - MavLink for communication
 
 ## Repo Structure
-- gnc/        — state estimation, control, guidance (primary domain)
-- perception/ — computer vision, gate detection
-- comms/      — drone interface layer
-- utils/      — shared math, logging
+
 
 ## Conventions
 - Type hints on all public functions
