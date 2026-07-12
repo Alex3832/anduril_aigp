@@ -19,7 +19,7 @@ _GRAVITY_NED = np.array([0.0, 0.0, 9.81])
 @dataclass
 class DroneState:
     """Snapshot of the drone's estimated state at a single point in time."""
-
+    # N , E, D  = X, Y, Z
     position:   np.ndarray = field(default_factory=lambda: np.zeros(3))  # NED (m),   IMU-integrated
     velocity:   np.ndarray = field(default_factory=lambda: np.zeros(3))  # NED (m/s), IMU-integrated
     attitude:   np.ndarray = field(default_factory=lambda: np.zeros(3))  # [roll, pitch, yaw] rad
@@ -82,12 +82,12 @@ class StateEstimator:
         self._state.timestamp = msg.time_boot_ms / 1000.0
 
     def _handle_imu(self, msg) -> None:
-        accel_body = np.array([msg.xacc,  msg.yacc,  msg.zacc])
+        accel_body = np.array([msg.xacc,  msg.yacc,  msg.zacc]) # x, y, z
         gyro       = np.array([msg.xgyro, msg.ygyro, msg.zgyro])
-        time_us    = msg.time_usec
-
+        time_us    = msg.time_usec # micro sec
+        # If therd's a change in recorded time
         if self._last_imu_time_us is not None:
-            dt = (time_us - self._last_imu_time_us) / 1e6
+            dt = (time_us - self._last_imu_time_us) / 1e6 # Calc change in time
 
             # Guard against bad dt: negative (out-of-order msg)
             if 0 < dt:

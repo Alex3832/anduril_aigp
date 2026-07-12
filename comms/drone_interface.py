@@ -148,7 +148,7 @@ class DroneInterface(abc.ABC):
             thrust:     Normalised collective thrust in [0, 1].
         """
 
-    @abc.abstractmethod
+    @abc.abstractmethod # Requires child classes to define method
     def set_attitude_rates_thrust(self, quaternion: np.ndarray,
                                   body_rates: np.ndarray, thrust: float) -> None:
         """Send SET_ATTITUDE_TARGET with attitude + body rates + thrust.
