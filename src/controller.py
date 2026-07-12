@@ -174,20 +174,22 @@ class Controller:
         self.sim_conn = sim_conn
         self.data = data
         self.system_boot_ms = system_boot_ms
+        self.target_ned = None
 
     def update(self):
         # send automated targets to sim flight controller
         # update_attitude_flight_control(self.sim_conn, self.system_boot_ms)
         # alternatively one of
-        update_position_flight_control(self.sim_conn, self.system_boot_ms, 0.0, 0.0, 0.0)  # test constant velocity command
+        # update_position_flight_control(self.sim_conn, self.system_boot_ms, 0.0, 0.0, 0.0)  # test constant velocity command
         # update_motor_control(self.sim_conn, self.system_boot_ms)
 
         # self.position_control_pid()
+        self.goto_ned()
 
         time.sleep(1.0 / CONTROL_HZ)
 
     def attitude_control_pid(self):
-        
+        pass
 
     def position_control_pid(self):
         P_gain = 0.5
@@ -210,6 +212,48 @@ class Controller:
         V_z = P_gain * z_error
 
         update_position_flight_control(self.sim_conn, self.system_boot_ms, V_x, V_y, V_z)
+
+    # -------------------------------
+    # Fly to an arbitrary NED position
+    # -------------------------------
+    def set_target_ned(self, x, y, z):
+        """Assign an arbitrary local NED target (metres, z negative = up) for goto_ned() to fly to."""
+        self.target_ned = (x, y, z)
+
+    def goto_ned(self, position_tolerance_m=0.25):
+        """
+        Drives the vehicle toward self.target_ned using the same P-control-on-velocity
+        approach as position_control_pid(), but against an arbitrary assigned point
+        instead of a race gate. Call this every control tick (e.g. from update()).
+
+        Returns True once the vehicle is within position_tolerance_m of the target.
+        """
+        P_gain = 0.5
+
+        if self.target_ned is None:
+            return False
+
+        if 'pos_x' not in self.data:
+            print("No position estimate received yet, skipping goto_ned update...", flush=True)
+            return False
+
+        target_x, target_y, target_z = self.target_ned
+
+        x_error = target_x - self.data['pos_x']
+        y_error = target_y - self.data['pos_y']
+        z_error = target_z - self.data['pos_z']
+
+        distance = (x_error ** 2 + y_error ** 2 + z_error ** 2) ** 0.5
+        if distance <= position_tolerance_m:
+            update_position_flight_control(self.sim_conn, self.system_boot_ms, 0.0, 0.0, 0.0)
+            return True
+
+        V_x = P_gain * x_error
+        V_y = P_gain * y_error
+        V_z = P_gain * z_error
+
+        update_position_flight_control(self.sim_conn, self.system_boot_ms, V_x, V_y, V_z)
+        return False
 
     # -------------------------------
     # Arm the drone

@@ -34,6 +34,10 @@ input("Press Enter to arm...")
 print("Arming drone...", flush=True)
 controller.arm()
 
+# Fly to an arbitrary point in the local NED frame (x=North, y=East, z=Down; z negative = up)
+# Test
+controller.set_target_ned(5.0, 0.0, -3.0)
+
 print("Starting control loop...", flush=True)
 is_running = True
 while is_running:
