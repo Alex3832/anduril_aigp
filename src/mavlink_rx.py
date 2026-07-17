@@ -124,13 +124,13 @@ class MAVLinkRX:
         response_time = msg.tc1
 
     def on_attitude(self, msg):
-        roll = msg.roll
-        pitch = msg.pitch
-        yaw = msg.yaw
-        roll_speed = msg.rollspeed
-        pitch_speed = msg.pitchspeed
-        yaw_speed = msg.yawspeed
-        time_boot_ms = msg.time_boot_ms
+        self.data['roll'] = msg.roll
+        self.data['pitch'] = msg.pitch
+        self.data['yaw'] = msg.yaw
+        self.data['rollspeed'] = msg.rollspeed
+        self.data['pitchspeed'] = msg.pitchspeed
+        self.data['yawspeed'] = msg.yawspeed
+        self.data['attitude_time_boot_ms'] = msg.time_boot_ms
 
     def on_local_position_ned(self, msg):
         self.data['pos_x'] = msg.x
