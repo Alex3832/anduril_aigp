@@ -5,6 +5,7 @@ pymavlink
 #cv2
 opencv-python
 numpy
+scipy
 
 # Debug
 matplotlib

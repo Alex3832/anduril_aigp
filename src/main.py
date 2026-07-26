@@ -40,12 +40,16 @@ controller.set_target_ned(5.0, 0.0, -3.0)
 
 print("Starting control loop...", flush=True)
 is_running = True
-while is_running:
-    controller.update()
+try:
+    while is_running:
+        controller.update()
+finally:
+    if controller.logger is not None:
+        controller.logger.close()
 
-# exit
-ts_loop.get_thread_for_join().join(timeout=1.0)
-mavlink_rx.get_thread_for_join().join(timeout=1.0)
-vision_rx.get_thread_for_join().join(timeout=1.0)
+    # exit
+    ts_loop.get_thread_for_join().join(timeout=1.0)
+    mavlink_rx.get_thread_for_join().join(timeout=1.0)
+    vision_rx.get_thread_for_join().join(timeout=1.0)
 
-print("Client exited!", flush=True)
+    print("Client exited!", flush=True)

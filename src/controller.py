@@ -2,6 +2,10 @@ import math
 import time
 
 from pymavlink import mavutil
+from scipy.spatial.transform import Rotation
+
+import config
+from data_logger import LogRow, RunLogger, NAN
 
 # --------------------------------------------------------------------------------------
 # RESET COMMAND
@@ -67,24 +71,22 @@ def update_motor_control(mavlink_conn, system_boot_ms):
 # --------------------------------------------------------------------------------------
 # ATTITUDE CONTROLS
 # --------------------------------------------------------------------------------------
-PITCH_RATE = -0.3   # rad/s (negative = pitch forward) - used by the constant-rate test helper only
-ROLL_RATE  = 0.0
-YAW_RATE   = 0.0
-THRUST     = 0.6    # 0.0 - 1.0, also used as the hover thrust trim for the PID cascade below
-
-RATES_ATTITUDE_MASK = (
-    mavutil.mavlink.ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE
+ATTITUDE_MASK = (
+    mavutil.mavlink.ATTITUDE_TARGET_TYPEMASK_BODY_ROLL_RATE_IGNORE |
+    mavutil.mavlink.ATTITUDE_TARGET_TYPEMASK_BODY_PITCH_RATE_IGNORE |
+    mavutil.mavlink.ATTITUDE_TARGET_TYPEMASK_BODY_YAW_RATE_IGNORE
 )
 
-def update_attitude_flight_control_test(mavlink_conn, system_boot_ms):
-    """Sends the fixed attitude-rate command above (module constants). Useful for bench testing."""
-    update_attitude_flight_control(mavlink_conn, system_boot_ms, ROLL_RATE, PITCH_RATE, YAW_RATE, THRUST)
+def euler_to_quaternion(roll: float, pitch: float, yaw: float) -> list:
+    """Aerospace ZYX (yaw-pitch-roll) Euler angles [rad] -> MAVLink w,x,y,z quaternion."""
+    qx, qy, qz, qw = Rotation.from_euler('ZYX', [yaw, pitch, roll]).as_quat()
+    return [qw, qx, qy, qz]
 
-def update_attitude_flight_control(mavlink_conn, system_boot_ms, roll_rate, pitch_rate, yaw_rate, thrust):
+def update_attitude_flight_control(mavlink_conn, system_boot_ms, q, thrust):
     now_ms = int(time.time() * 1000)
 
     """
-    Sets a desired vehicle attitude rate + thrust. Used by an external controller to
+    Sets a desired vehicle attitude + thrust. Used by an external controller to
     command the vehicle (manual controller or other system).
 
     time_boot_ms              : Timestamp (time since system boot). [ms] (type:uint32_t)
@@ -92,20 +94,20 @@ def update_attitude_flight_control(mavlink_conn, system_boot_ms, roll_rate, pitc
     target_component          : Component ID (type:uint8_t)
     type_mask                 : Bitmap to indicate which dimensions should be ignored by the vehicle. (type:uint8_t, values:ATTITUDE_TARGET_TYPEMASK)
     q                         : Attitude quaternion (w, x, y, z order, zero-rotation is 1, 0, 0, 0) (type:float)
-    body_roll_rate            : Body roll rate [rad/s] (type:float)
-    body_pitch_rate           : Body pitch rate [rad/s] (type:float)
-    body_yaw_rate             : Body yaw rate [rad/s] (type:float)
+    body_roll_rate            : Body roll rate [rad/s] (type:float) - ignored, rate loop closed onboard
+    body_pitch_rate           : Body pitch rate [rad/s] (type:float) - ignored, rate loop closed onboard
+    body_yaw_rate             : Body yaw rate [rad/s] (type:float) - ignored, rate loop closed onboard
     thrust                    : Collective thrust, normalized to 0 .. 1 (-1 .. 1 for vehicles capable of reverse trust) (type:float)
     """
     mavlink_conn.mav.set_attitude_target_send(
         now_ms - system_boot_ms,
         mavlink_conn.target_system,
         mavlink_conn.target_component,
-        RATES_ATTITUDE_MASK,
-        [1, 0, 0, 0],  # dummy quaternion (ignored)
-        roll_rate,
-        pitch_rate,
-        yaw_rate,
+        ATTITUDE_MASK,
+        q,
+        0.0,
+        0.0,
+        0.0,
         thrust
     )
 
@@ -206,7 +208,7 @@ def update_position_flight_control(mavlink_conn, system_boot_ms, vx, vy, vz):
 # Control Loop
 # --------------------------------------------------------------------------------------
 
-CONTROL_HZ = 250
+CONTROL_HZ = config.CONTROL_HZ
 
 class Controller:
     def __init__(self, sim_conn, data, system_boot_ms):
@@ -214,23 +216,20 @@ class Controller:
         self.data = data
         self.system_boot_ms = system_boot_ms
         self.target_ned = None
-        self.target_yaw = 0.0
+        self.target_yaw = math.pi
+
+        self.arm_time = None
+        self.logger = None
 
         # Outer loop: NED position error [m] -> desired NED velocity setpoint [m/s]
-        # kp, ki, kd are weighting factors for proportional, integral, and derivative 
-        self.pos_pid_x = PID(kp=0.8, ki=0.0, kd=0.1, output_limit=4.0)
-        self.pos_pid_y = PID(kp=0.8, ki=0.0, kd=0.1, output_limit=4.0)
-        self.pos_pid_z = PID(kp=0.8, ki=0.0, kd=0.1, output_limit=3.0)
+        self.pos_pid_x = PID(**vars(config.POS_X))
+        self.pos_pid_y = PID(**vars(config.POS_Y))
+        self.pos_pid_z = PID(**vars(config.POS_Z))
 
         # Middle loop: NED velocity error [m/s] -> desired roll/pitch angle [rad] + thrust [0..1]
-        self.vel_pid_roll   = PID(kp=0.12, ki=0.02, kd=0.01, output_limit=0.35)
-        self.vel_pid_pitch  = PID(kp=0.12, ki=0.02, kd=0.01, output_limit=0.35)
-        self.vel_pid_thrust = PID(kp=0.10, ki=0.05, kd=0.02, output_limit=0.4)
-
-        # Inner loop: attitude angle error [rad] -> body rate setpoint [rad/s]
-        self.att_pid_roll  = PID(kp=6.0, ki=0.0, kd=0.3, output_limit=4.0)
-        self.att_pid_pitch = PID(kp=6.0, ki=0.0, kd=0.3, output_limit=4.0)
-        self.att_pid_yaw   = PID(kp=3.0, ki=0.0, kd=0.2, output_limit=2.0)
+        self.vel_pid_roll   = PID(**vars(config.VEL_ROLL))
+        self.vel_pid_pitch  = PID(**vars(config.VEL_PITCH))
+        self.vel_pid_thrust = PID(**vars(config.VEL_THRUST))
 
     def update(self):
         # send automated targets to sim flight controller
@@ -244,24 +243,11 @@ class Controller:
 
         time.sleep(1.0 / CONTROL_HZ)
 # sp refers to set point
-    def attitude_control_pid(self, roll_sp, pitch_sp, yaw_sp, thrust_sp, now):
-        """Inner loop: attitude angle error [rad] -> body rate [rad/s], sent as an ATTITUDE_TARGET."""
-        # Error = desired - current state
-        roll_error  = roll_sp  - self.data.get('roll', 0.0)
-        pitch_error = pitch_sp - self.data.get('pitch', 0.0)
-        yaw_error   = self._wrap_to_pi(yaw_sp - self.data.get('yaw', 0.0))
-
-        roll_rate  = self.att_pid_roll.update(roll_error, now)
-        pitch_rate = self.att_pid_pitch.update(pitch_error, now)
-        yaw_rate   = self.att_pid_yaw.update(yaw_error, now)
-
-        update_attitude_flight_control(
-            self.sim_conn, self.system_boot_ms, roll_rate, pitch_rate, yaw_rate, thrust_sp
-        )
-
-    @staticmethod
-    def _wrap_to_pi(angle):
-        return (angle + math.pi) % (2 * math.pi) - math.pi
+    def attitude_command(self, roll_sp, pitch_sp, yaw_sp, thrust_sp):
+        """Convert the commanded roll/pitch/yaw directly into a quaternion attitude target,
+        sent as an ATTITUDE_TARGET. The vehicle's onboard controller closes the rate loop."""
+        q = euler_to_quaternion(roll_sp, pitch_sp, yaw_sp)
+        update_attitude_flight_control(self.sim_conn, self.system_boot_ms, q, thrust_sp)
 
     def position_control_pid(self):
         P_gain = 0.5
@@ -286,18 +272,18 @@ class Controller:
         update_position_flight_control(self.sim_conn, self.system_boot_ms, V_x, V_y, V_z)
 
     # -------------------------------
-    # Fly to an arbitrary NED position (cascaded PID: position -> velocity -> attitude -> rates)
+    # Fly to an arbitrary NED position (cascaded PID: position -> velocity -> attitude quaternion)
     # -------------------------------
-    def set_target_ned(self, x, y, z, yaw=0.0):
+    def set_target_ned(self, x, y, z, yaw=math.pi):
         """Assign an arbitrary local NED target (metres, z negative = up) + heading [rad] to fly to."""
         self.target_ned = (x, y, z)
         self.target_yaw = yaw
 
     def position_pid_step(self, now):
         """Outer loop: NED position error [m] -> desired NED velocity setpoint [m/s]."""
-        x_error = self.target_ned[0] - self.data['pos_x']
-        y_error = self.target_ned[1] - self.data['pos_y']
-        z_error = self.target_ned[2] - self.data['pos_z']
+        x_error = self.data['gates'][self.data['active_gate_index']]['position_ned_x'] - self.data['pos_x']
+        y_error = self.data['gates'][self.data['active_gate_index']]['position_ned_y'] - self.data['pos_y']
+        z_error = self.data['gates'][self.data['active_gate_index']]['position_ned_z'] - self.data['pos_z']
 
         vx_sp = self.pos_pid_x.update(x_error, now)
         vy_sp = self.pos_pid_y.update(y_error, now)
@@ -315,16 +301,16 @@ class Controller:
         vz_error = vz_sp - self.data.get('vel_z', 0.0)
 
         pitch_sp = -self.vel_pid_pitch.update(vx_error, now)   # need +North accel -> nose-down (negative) pitch
-        roll_sp  =  self.vel_pid_roll.update(vy_error, now)    # need +East accel  -> bank right (positive) roll
-        thrust_sp = THRUST - self.vel_pid_thrust.update(vz_error, now)  # +Down vel error -> reduce thrust
+        roll_sp  = -self.vel_pid_roll.update(vy_error, now)    # need +East accel  -> bank right (positive) roll
+        thrust_sp = (1/ math.cos(self.data['pitch'])) * (.3 - self.vel_pid_thrust.update(vz_error, now)) # could cause gimbal lock  # +Down vel error -> reduce thrust
         thrust_sp = max(0.0, min(1.0, thrust_sp))
-
+    
         return roll_sp, pitch_sp, thrust_sp
 
     def goto_ned(self, position_tolerance_m=0.25):
         """
         Cascaded PID flight to self.target_ned:
-          position error -> velocity setpoint -> roll/pitch/thrust setpoint -> body rates
+          position error -> velocity setpoint -> roll/pitch/thrust setpoint -> quaternion attitude target
         Call every control tick (e.g. from update()). Returns True once within tolerance.
         """
         if self.target_ned is None:
@@ -346,9 +332,36 @@ class Controller:
             vx_sp = vy_sp = vz_sp = 0.0
 
         roll_sp, pitch_sp, thrust_sp = self.velocity_pid_step(vx_sp, vy_sp, vz_sp, now)
-        self.attitude_control_pid(roll_sp, pitch_sp, self.target_yaw, thrust_sp, now)
+        self.attitude_command(roll_sp, pitch_sp, self.target_yaw, thrust_sp)
+
+        if self.logger is not None:
+            self._log_tick(now, vx_sp, vy_sp, vz_sp, roll_sp, pitch_sp)
 
         return distance <= position_tolerance_m
+
+    def _log_tick(self, now, vx_sp, vy_sp, vz_sp, roll_sp, pitch_sp):
+        """Log commanded (setpoint) vs. actual (measured) values for every quantity in the cascade."""
+        d = self.data
+        row = LogRow(
+            t=now - self.arm_time,
+
+            x_cmd=self.data['gates'][self.data['active_gate_index']]['position_ned_x'], x_act=d.get('pos_x', NAN),
+            y_cmd=self.data['gates'][self.data['active_gate_index']]['position_ned_y'], y_act=d.get('pos_y', NAN),
+            z_cmd=self.data['gates'][self.data['active_gate_index']]['position_ned_z'], z_act=d.get('pos_z', NAN),
+
+            vx_cmd=vx_sp, vx_act=d.get('vel_x', NAN),
+            vy_cmd=vy_sp, vy_act=d.get('vel_y', NAN),
+            vz_cmd=vz_sp, vz_act=d.get('vel_z', NAN),
+
+            roll_cmd=roll_sp, roll_act=d.get('roll', NAN),
+            pitch_cmd=pitch_sp, pitch_act=d.get('pitch', NAN),
+            yaw_cmd=self.target_yaw, yaw_act=d.get('yaw', NAN),
+
+            roll_rate_act=d.get('rollspeed', NAN),
+            pitch_rate_act=d.get('pitchspeed', NAN),
+            yaw_rate_act=d.get('yawspeed', NAN),
+        )
+        self.logger.log(row)
 
     # -------------------------------
     # Arm the drone
@@ -362,6 +375,9 @@ class Controller:
             1,  # arm
             0, 0, 0, 0, 0, 0
         )
+        self.arm_time = time.time()
+        self.logger = RunLogger()
+        print(f"Logging run to {self.logger.path}", flush=True)
 
     def send_sim_reset_command(self):
         self.sim_conn.mav.command_long_send(
