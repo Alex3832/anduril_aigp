@@ -283,7 +283,7 @@ class Controller:
         """Outer loop: NED position error [m] -> desired NED velocity setpoint [m/s]."""
         x_error = self.data['gates'][self.data['active_gate_index']]['position_ned_x'] - self.data['pos_x']
         y_error = self.data['gates'][self.data['active_gate_index']]['position_ned_y'] - self.data['pos_y']
-        z_error = self.data['gates'][self.data['active_gate_index']]['position_ned_z'] - self.data['pos_z']
+        z_error = self.data['gates'][self.data['active_gate_index']]['position_ned_z'] - self.data['pos_z'] - config.Z_OFFSET
 
         vx_sp = self.pos_pid_x.update(x_error, now)
         vy_sp = self.pos_pid_y.update(y_error, now)
@@ -302,8 +302,7 @@ class Controller:
 
         pitch_sp = -self.vel_pid_pitch.update(vx_error, now)   # need +North accel -> nose-down (negative) pitch
         roll_sp  = -self.vel_pid_roll.update(vy_error, now)    # need +East accel  -> bank right (positive) roll
-        thrust_sp = (config.HOVER_THRUST - self.vel_pid_thrust.update(vz_error, now)) # could cause gimbal lock  # +Down vel error -> reduce thrust
-        # (1/ math.cos(self.data['pitch'])) * 
+        thrust_sp = config.HOVER_THRUST - vz_sp / .25
         thrust_sp = max(0.0, min(1.0, thrust_sp))
     
         return roll_sp, pitch_sp, thrust_sp

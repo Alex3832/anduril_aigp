@@ -35,3 +35,5 @@ VEL_PITCH = PIDGains(kp=0.08, ki=0.02, kd=0.01, output_limit=0.1)
 VEL_THRUST = PIDGains(kp=0.3, ki=0.05, kd=0.1, output_limit=1, integral_limit=0.2)
 
 HOVER_THRUST = 0.266  # hover thrust [0..1]
+
+Z_OFFSET = 0.9 
