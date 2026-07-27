@@ -34,6 +34,7 @@ class LogRow:
     pitch_act: float
     yaw_cmd: float
     yaw_act: float
+    thrust_cmd: float
 
     roll_rate_act: float
     pitch_rate_act: float

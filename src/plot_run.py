@@ -16,7 +16,8 @@ import matplotlib.pyplot as plt
 import config
 
 # (title, cmd column or None, act column) - rates have no cmd column: the rate loop
-# is closed onboard the vehicle, not commanded by this code.
+# is closed onboard the vehicle, not commanded by this code. Thrust has no act column:
+# there's no actual-thrust telemetry from the sim, only the commanded value.
 QUANTITIES = [
     ("x [m]", "x_cmd", "x_act"),
     ("y [m]", "y_cmd", "y_act"),
@@ -29,7 +30,7 @@ QUANTITIES = [
     ("yaw [rad]", "yaw_cmd", "yaw_act"),
     ("roll_rate [rad/s]", None, "roll_rate_act"),
     ("pitch_rate [rad/s]", None, "pitch_rate_act"),
-    ("yaw_rate [rad/s]", None, "yaw_rate_act"),
+    ("thrust [0..1]", None, "thrust_cmd"),
 ]
 
 
@@ -57,7 +58,8 @@ def plot_run(path):
     for ax, (title, cmd_col, act_col) in zip(axes.flat, QUANTITIES):
         if cmd_col is not None:
             ax.plot(t, [row[cmd_col] for row in rows], label="commanded", linewidth=1.5)
-        ax.plot(t, [row[act_col] for row in rows], label="actual", linewidth=1.0, alpha=0.8)
+        act_label = "commanded" if act_col.endswith("_cmd") else "actual"
+        ax.plot(t, [row[act_col] for row in rows], label=act_label, linewidth=1.0, alpha=0.8)
         ax.set_title(title)
         ax.set_xlabel("t [s since arm]")
         ax.legend(fontsize="small")

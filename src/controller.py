@@ -302,7 +302,8 @@ class Controller:
 
         pitch_sp = -self.vel_pid_pitch.update(vx_error, now)   # need +North accel -> nose-down (negative) pitch
         roll_sp  = -self.vel_pid_roll.update(vy_error, now)    # need +East accel  -> bank right (positive) roll
-        thrust_sp = (1/ math.cos(self.data['pitch'])) * (.3 - self.vel_pid_thrust.update(vz_error, now)) # could cause gimbal lock  # +Down vel error -> reduce thrust
+        thrust_sp = (config.HOVER_THRUST - self.vel_pid_thrust.update(vz_error, now)) # could cause gimbal lock  # +Down vel error -> reduce thrust
+        # (1/ math.cos(self.data['pitch'])) * 
         thrust_sp = max(0.0, min(1.0, thrust_sp))
     
         return roll_sp, pitch_sp, thrust_sp
@@ -335,11 +336,11 @@ class Controller:
         self.attitude_command(roll_sp, pitch_sp, self.target_yaw, thrust_sp)
 
         if self.logger is not None:
-            self._log_tick(now, vx_sp, vy_sp, vz_sp, roll_sp, pitch_sp)
+            self._log_tick(now, vx_sp, vy_sp, vz_sp, roll_sp, pitch_sp, thrust_sp)
 
         return distance <= position_tolerance_m
 
-    def _log_tick(self, now, vx_sp, vy_sp, vz_sp, roll_sp, pitch_sp):
+    def _log_tick(self, now, vx_sp, vy_sp, vz_sp, roll_sp, pitch_sp, thrust_sp):
         """Log commanded (setpoint) vs. actual (measured) values for every quantity in the cascade."""
         d = self.data
         row = LogRow(
@@ -356,6 +357,7 @@ class Controller:
             roll_cmd=roll_sp, roll_act=d.get('roll', NAN),
             pitch_cmd=pitch_sp, pitch_act=d.get('pitch', NAN),
             yaw_cmd=self.target_yaw, yaw_act=d.get('yaw', NAN),
+            thrust_cmd=thrust_sp,
 
             roll_rate_act=d.get('rollspeed', NAN),
             pitch_rate_act=d.get('pitchspeed', NAN),
