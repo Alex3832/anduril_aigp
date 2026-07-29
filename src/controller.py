@@ -229,7 +229,7 @@ class Controller:
         # Middle loop: NED velocity error [m/s] -> desired roll/pitch angle [rad] + thrust [0..1]
         self.vel_pid_roll   = PID(**vars(config.VEL_ROLL))
         self.vel_pid_pitch  = PID(**vars(config.VEL_PITCH))
-        self.vel_pid_thrust = PID(**vars(config.VEL_THRUST))
+        # self.vel_pid_thrust = PID(**vars(config.VEL_THRUST))
 
     def update(self):
         # send automated targets to sim flight controller
@@ -302,7 +302,7 @@ class Controller:
 
         pitch_sp = -self.vel_pid_pitch.update(vx_error, now)   # need +North accel -> nose-down (negative) pitch
         roll_sp  = -self.vel_pid_roll.update(vy_error, now)    # need +East accel  -> bank right (positive) roll
-        thrust_sp = config.HOVER_THRUST - vz_sp / .25
+        thrust_sp = config.HOVER_THRUST - (vz_sp / config.THRUST_DILUTION)
         thrust_sp = max(0.0, min(1.0, thrust_sp))
     
         return roll_sp, pitch_sp, thrust_sp
