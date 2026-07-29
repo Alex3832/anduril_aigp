@@ -44,7 +44,7 @@ class LogRow:
 class RunLogger:
     """Writes one CSV row per control tick for a single armed run."""
 
-    def __init__(self, log_dir=config.LOG_DIR):
+    def __init__(self, log_dir: str = config.LOG_DIR):
         os.makedirs(log_dir, exist_ok=True)
         filename = f"run_{time.strftime('%Y%m%d_%H%M%S')}.csv"
         self.path = os.path.join(log_dir, filename)
@@ -52,9 +52,9 @@ class RunLogger:
         self._writer = csv.writer(self._file)
         self._writer.writerow([f.name for f in dataclasses.fields(LogRow)])
 
-    def log(self, row: LogRow):
+    def log(self, row: LogRow) -> None:
         self._writer.writerow(dataclasses.astuple(row))
         self._file.flush()
 
-    def close(self):
+    def close(self) -> None:
         self._file.close()

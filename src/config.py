@@ -32,10 +32,9 @@ POS_Z = PIDGains(kp=0.05, ki=0.1, kd=0.1, output_limit=0.25)
 # Middle loop: NED velocity error [m/s] -> desired roll/pitch angle [rad] + thrust [0..1]
 VEL_ROLL = PIDGains(kp=0.12, ki=0.02, kd=0.01, output_limit=0.2)
 VEL_PITCH = PIDGains(kp=0.08, ki=0.02, kd=0.01, output_limit=0.1)
-# VEL_THRUST = PIDGains(kp=0.3, ki=0.05, kd=0.1, output_limit=1, integral_limit=0.2)
 
-HOVER_THRUST = 0.266  # hover thrust found expirementally
+HOVER_THRUST = 0.266  # hover thrust found experimentally
 
-THRUST_DILUTION = 2.0 # dilutes normal thrust to reduce saturation and allow for the 
+THRUST_DILUTION = 2.0  # dilutes vz_sp before subtracting from HOVER_THRUST, to reduce thrust saturation
 
 Z_OFFSET = 0.9 

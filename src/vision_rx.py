@@ -4,6 +4,7 @@ import threading
 
 import cv2
 import numpy as np
+import numpy.typing as npt
 
 # Modify these properties if you want to run the server remotely for example
 SIM_SERVER_UDP_IP = "0.0.0.0"
@@ -11,7 +12,7 @@ SIM_SERVER_UDP_PORT = 5600
 
 class VisionRX:
 
-    def __init__(self, data):
+    def __init__(self, data: dict):
         self.data = data
         self.thread = threading.Thread(
             target=self._vision_loop,
@@ -20,11 +21,11 @@ class VisionRX:
         self.is_running = True
         self.thread.start()
 
-    def get_thread_for_join(self):
+    def get_thread_for_join(self) -> threading.Thread:
         self.is_running = False
         return self.thread
 
-    def _vision_loop(self):
+    def _vision_loop(self) -> None:
         header_format = "<IHHIIQ"
         header_sz = struct.calcsize(header_format)
         frames = {}  # frame_id -> received associated frame data
@@ -82,7 +83,7 @@ class VisionRX:
 
                 del frames[frame_id]
 
-    def process_frame(self, frame_id, img):
+    def process_frame(self, frame_id: int, img: npt.NDArray) -> None:
         #
         #
         # Success!

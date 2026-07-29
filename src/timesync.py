@@ -1,5 +1,6 @@
-import time
 import threading
+import time
+from typing import Any, Optional
 
 from pymavlink import mavutil
 
@@ -7,14 +8,14 @@ TIMESYNC_REQUEST_HZ = 10
 
 class TimeSync:
 
-    def __init__(self, mavlink_connection, data):
+    def __init__(self, mavlink_connection: Any, data: dict):
         self.mavlink_conn = mavlink_connection
         self.data = data
-        self.thread = None
+        self.thread: Optional[threading.Thread] = None
         self.is_running = False
 
     @classmethod
-    def create_timesync(cls, mavlink_connection, data):
+    def create_timesync(cls, mavlink_connection: Any, data: dict) -> "TimeSync":
         ts = cls(mavlink_connection, data)
         ts.thread = threading.Thread(
             target=ts.timesync_loop,
@@ -24,11 +25,11 @@ class TimeSync:
         ts.thread.start()
         return ts
 
-    def get_thread_for_join(self):
+    def get_thread_for_join(self) -> Optional[threading.Thread]:
         self.is_running = False
         return self.thread
 
-    def timesync_loop(self):
+    def timesync_loop(self) -> None:
         while self.is_running:
             now = int(time.time_ns())
             self.mavlink_conn.mav.timesync_send(

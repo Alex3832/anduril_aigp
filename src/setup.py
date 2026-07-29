@@ -1,10 +1,12 @@
+from typing import Any
+
 from pymavlink import mavutil
 from timesync import TimeSync
 from vision_rx import VisionRX
 from mavlink_rx import MAVLinkRX
 from controller import Controller
 
-def setup_components(shared_data, system_boot_ms, server_ip, server_udp_port):
+def setup_components(shared_data: dict, system_boot_ms: int, server_ip: str, server_udp_port: int) -> dict[str, Any]:
     # -------------------------------
     # Mavlink Connection
     # -------------------------------
@@ -24,7 +26,7 @@ def setup_components(shared_data, system_boot_ms, server_ip, server_udp_port):
     # Timesync request Loop
     # -------------------------------
     print("Setting up Timesync loop...", flush=True)
-    ts_loop = TimeSync(sim_conn, shared_data)
+    ts_loop = TimeSync.create_timesync(sim_conn, shared_data)
 
     # -------------------------------
     # Connect Vision receiver

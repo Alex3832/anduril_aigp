@@ -14,7 +14,7 @@ SIM_SERVER_UDP_PORT = 14550
 system_boot_ms = int(time.time() * 1000)
 
 # arbitrary shared data between the various components
-shared_data = {}
+shared_data: dict = {}
 
 
 # setup components

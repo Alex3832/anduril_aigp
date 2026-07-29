@@ -1,6 +1,7 @@
 import struct
-import time
 import threading
+import time
+from typing import Any, Optional
 
 from pymavlink import mavutil
 
@@ -9,17 +10,17 @@ ENCAPSULATED_TRACK_INFO_MSG_ID  = 2
 
 class MAVLinkRX:
 
-    def __init__(self, mavlink_connection, data):
+    def __init__(self, mavlink_connection: Any, data: dict):
         self.mavlink_conn = mavlink_connection
         self.data = data
-        self.thread = None
+        self.thread: Optional[threading.Thread] = None
         self.is_running = False
 
-        self.track_chunks = {}
-        self.expected_num_track_chunks = {}
+        self.track_chunks: dict = {}
+        self.expected_num_track_chunks: dict = {}
 
     @classmethod
-    def create_mavlink_rx(cls, mavlink_connection, data):
+    def create_mavlink_rx(cls, mavlink_connection: Any, data: dict) -> "MAVLinkRX":
         rx = cls(mavlink_connection, data)
         rx.thread = threading.Thread(
             target=rx.mavlink_receive_loop,
@@ -29,11 +30,11 @@ class MAVLinkRX:
         rx.thread.start()
         return rx
 
-    def get_thread_for_join(self):
+    def get_thread_for_join(self) -> Optional[threading.Thread]:
         self.is_running = False
         return self.thread
 
-    def mavlink_receive_loop(self):
+    def mavlink_receive_loop(self) -> None:
         """
         Continuously receive MAVLink messages without blocking.
         """
@@ -116,14 +117,14 @@ class MAVLinkRX:
                 self.track_chunks[track_data_transfer_id] = {}
                 self.expected_num_track_chunks[track_data_transfer_id] = msg.packets
 
-    def on_heartbeat(self, msg):
+    def on_heartbeat(self, msg: Any) -> None:
         armed = msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED
 
-    def on_timesync(self, msg):
+    def on_timesync(self, msg: Any) -> None:
         request_time = msg.ts1
         response_time = msg.tc1
 
-    def on_attitude(self, msg):
+    def on_attitude(self, msg: Any) -> None:
         self.data['roll'] = msg.roll
         self.data['pitch'] = msg.pitch
         self.data['yaw'] = msg.yaw
@@ -132,7 +133,7 @@ class MAVLinkRX:
         self.data['yawspeed'] = msg.yawspeed
         self.data['attitude_time_boot_ms'] = msg.time_boot_ms
 
-    def on_local_position_ned(self, msg):
+    def on_local_position_ned(self, msg: Any) -> None:
         self.data['pos_x'] = msg.x
         self.data['pos_y'] = msg.y
         self.data['pos_z'] = msg.z
@@ -141,7 +142,7 @@ class MAVLinkRX:
         self.data['vel_z'] = msg.vz
         self.data['time_boot_ms'] = msg.time_boot_ms
 
-    def on_odometry(self, msg):
+    def on_odometry(self, msg: Any) -> None:
         pos_x, pos_y, pos_z = msg.x, msg.y, msg.z
         qx, qy, qz, qw = msg.q[1], msg.q[2], msg.q[3], msg.q[0]
         vel_x, vel_y, vel_z = msg.vx, msg.vy, msg.vz
@@ -151,12 +152,12 @@ class MAVLinkRX:
         time_boot_us = msg.time_usec
         reset_count = msg.reset_counter
 
-    def on_highres_imu(self, msg):
+    def on_highres_imu(self, msg: Any) -> None:
         acceleration_x, acceleration_y, acceleration_z = msg.xacc, msg.yacc, msg.zacc
         gyro_x, gyro_y, gyro_z = msg.xgyro, msg.ygyro, msg.zgyro
         time_boot_us = msg.time_usec
 
-    def on_encapsulated_data(self, msg):
+    def on_encapsulated_data(self, msg: Any) -> None:
         if msg:
             raw_payload = bytes(msg.data)
             data_type = raw_payload[0]
@@ -166,7 +167,7 @@ class MAVLinkRX:
             elif int(data_type) == ENCAPSULATED_TRACK_INFO_MSG_ID:
                 self.on_track_data_packet(msg)
 
-    def on_race_status(self, msg):
+    def on_race_status(self, msg: Any) -> None:
         raw_payload = bytes(msg.data)
         # data_type - ID of this message
         # sim_boot_time_ms - elapsed ms on server since sim boot
@@ -178,7 +179,7 @@ class MAVLinkRX:
             "<BQqqIq", raw_payload)
         self.data['active_gate_index'] = active_gate_index
 
-    def on_track_data_packet(self, msg):
+    def on_track_data_packet(self, msg: Any) -> None:
         raw_payload = bytes(msg.data)
         # header:
         #   data_type - ID of this message
@@ -196,7 +197,7 @@ class MAVLinkRX:
             del self.expected_num_track_chunks[transfer_id]
             self.on_track_data(full_payload)
 
-    def on_track_data(self, payload):
+    def on_track_data(self, payload: bytes) -> None:
         # header:
         #   num_gates - track gate count
         num_gates, = struct.unpack_from("<H", payload)
@@ -225,14 +226,14 @@ class MAVLinkRX:
                 'height': height
             }
 
-    def on_actuator_output_status(self, msg):
+    def on_actuator_output_status(self, msg: Any) -> None:
         time_boot_us = msg.time_usec
         motor_front_left = msg.actuator[0]
         motor_front_right = msg.actuator[1]
         motor_back_left = msg.actuator[2]
         motor_back_right = msg.actuator[3]
 
-    def on_collision(self, msg):
+    def on_collision(self, msg: Any) -> None:
         # Collision IDs
         # 1001 - Gate
         # 1002 - Environment
