@@ -281,13 +281,14 @@ class Controller:
 
     def position_pid_step(self, now):
         """Outer loop: NED position error [m] -> desired NED velocity setpoint [m/s]."""
-        x_error = self.data['gates'][self.data['active_gate_index']]['position_ned_x'] - self.data['pos_x']
-        y_error = self.data['gates'][self.data['active_gate_index']]['position_ned_y'] - self.data['pos_y']
-        z_error = self.data['gates'][self.data['active_gate_index']]['position_ned_z'] - self.data['pos_z']
+        x_error = self.target_ned[0] - self.data['pos_x']
+        y_error = self.target_ned[1] - self.data['pos_y']
+        z_error = self.target_ned[2] - self.data['pos_z']
 
         vx_sp = self.pos_pid_x.update(x_error, now)
         vy_sp = self.pos_pid_y.update(y_error, now)
         vz_sp = self.pos_pid_z.update(z_error, now)
+
         return vx_sp, vy_sp, vz_sp
 
     def velocity_pid_step(self, vx_sp, vy_sp, vz_sp, now):
@@ -304,7 +305,7 @@ class Controller:
         roll_sp  = -self.vel_pid_roll.update(vy_error, now)    # need +East accel  -> bank right (positive) roll
         thrust_sp = (1/ math.cos(self.data['pitch'])) * (.3 - self.vel_pid_thrust.update(vz_error, now)) # could cause gimbal lock  # +Down vel error -> reduce thrust
         thrust_sp = max(0.0, min(1.0, thrust_sp))
-    
+        print(f"thrust_sp={thrust_sp:.3f}", flush=True)
         return roll_sp, pitch_sp, thrust_sp
 
     def goto_ned(self, position_tolerance_m=0.25):
